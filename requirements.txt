@@ -1,0 +1,11 @@
+et_xmlfile
+narwhals
+numpy
+openpyxl
+packaging
+pandas
+plotly
+python-dateutil
+pytz
+six
+tzdata

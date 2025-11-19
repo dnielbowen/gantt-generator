@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Plotly Gantt chart for the Component 4 plan CSV."""
+"""Render a Plotly Gantt chart for the Component 4 Planner export (CSV/XLSX)."""
 from __future__ import annotations
 
 import argparse
@@ -29,10 +29,12 @@ DEFAULT_DURATION_DAYS = 7
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--input",
         "--csv",
+        dest="source",
         type=Path,
         default=Path("input.csv"),
-        help="Path to the CSV exported from Planner",
+        help="Path to the Planner export (CSV or XLSX)",
     )
     parser.add_argument(
         "--output",
@@ -43,11 +45,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_tasks(csv_path: Path) -> pd.DataFrame:
-    if not csv_path.exists():
-        raise FileNotFoundError(f"CSV not found: {csv_path}")
+def load_tasks(source_path: Path) -> pd.DataFrame:
+    if not source_path.exists():
+        raise FileNotFoundError(f"Input not found: {source_path}")
 
-    df = pd.read_csv(csv_path, engine="python")
+    df = _read_planner_export(source_path)
     df.rename(columns=lambda col: col.strip(), inplace=True)
 
     for column in DATE_COLUMNS:
@@ -73,6 +75,20 @@ def load_tasks(csv_path: Path) -> pd.DataFrame:
     df.sort_values(by=["Start", "Finish", "Task Name"], inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
+
+
+def _read_planner_export(path: Path) -> pd.DataFrame:
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return pd.read_csv(path, engine="python")
+    if suffix in {".xlsx", ".xls"}:
+        try:
+            return pd.read_excel(path, sheet_name="Tasks")
+        except ValueError as exc:  # sheet not found
+            raise ValueError(
+                f"Worksheet 'Tasks' not found in {path.name}"
+            ) from exc
+    raise ValueError(f"Unsupported file type: {path.suffix or 'unknown'}")
 
 
 def _derive_schedule(row: pd.Series) -> pd.Series:
@@ -158,9 +174,9 @@ def build_figure(df: pd.DataFrame) -> Figure:
 
 def main() -> None:
     args = parse_args()
-    df = load_tasks(args.csv)
+    df = load_tasks(args.source)
     if df.empty:
-        raise SystemExit("No tasks with schedule info found in CSV")
+        raise SystemExit("No tasks with schedule info found in Planner export")
 
     fig = build_figure(df)
     args.output.parent.mkdir(parents=True, exist_ok=True)
