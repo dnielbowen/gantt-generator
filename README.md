@@ -1,5 +1,5 @@
 
-# Component 4 Gantt Renderer
+# MS Teams Tasks Gantt Renderer
 
 This repository turns the MS Teams task plan into an interactive Plotly Gantt chart. It accepts either the Microsoft Planner CSV export or the equivalent XLSX workbook (the `Tasks` worksheet) and produces a standalone HTML timeline.
 
@@ -18,6 +18,7 @@ This repository turns the MS Teams task plan into an interactive Plotly Gantt ch
    ```bash
    .venv/bin/python render_gantt.py --input data/exportedTasks.xlsx --output gantt.html
    ```
+   Optional flags include `--title "My Custom Timeline"`; otherwise the chart title defaults to the input file name (e.g., `exportedTasks`).
 
 ## Planner CSV/XLSX Format
 

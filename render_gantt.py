@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Plotly Gantt chart for the Component 4 Planner export (CSV/XLSX)."""
+"""Render a Plotly Gantt chart for a Microsoft Planner export (CSV/XLSX)."""
 from __future__ import annotations
 
 import argparse
@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("gantt.html"),
         help="Destination HTML file for the Plotly chart",
+    )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Overrides the chart title (defaults to the input filename)",
     )
     return parser.parse_args()
 
@@ -114,7 +120,7 @@ def _derive_schedule(row: pd.Series) -> pd.Series:
     return pd.Series({"Start": start, "Finish": finish})
 
 
-def build_figure(df: pd.DataFrame) -> Figure:
+def build_figure(df: pd.DataFrame, chart_title: str) -> Figure:
     fig = px.timeline(
         df,
         x_start="Start",
@@ -158,7 +164,7 @@ def build_figure(df: pd.DataFrame) -> Figure:
     )
 
     fig.update_layout(
-        title="Component 4 – Ground Tools & UI Timeline",
+        title=chart_title,
         xaxis_title="Schedule",
         yaxis_title="Tasks",
         legend_title="Bucket",
@@ -178,7 +184,8 @@ def main() -> None:
     if df.empty:
         raise SystemExit("No tasks with schedule info found in Planner export")
 
-    fig = build_figure(df)
+    chart_title = args.title or args.source.stem or "Planner Tasks Timeline"
+    fig = build_figure(df, chart_title)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs="cdn", full_html=True)
     print(f"Wrote Gantt chart to {args.output.resolve()}")
