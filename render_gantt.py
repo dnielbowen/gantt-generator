@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Iterable
 
@@ -47,6 +48,17 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Overrides the chart title (defaults to the input filename)",
+    )
+    parser.add_argument(
+        "--exclude-bucket",
+        dest="exclude_buckets",
+        action="append",
+        default=[],
+        metavar="PATTERN",
+        help=(
+            "Glob pattern for bucket names to exclude; repeat for multiple "
+            "patterns (e.g., --exclude-bucket '*4.1*')"
+        ),
     )
     return parser.parse_args()
 
@@ -178,9 +190,20 @@ def build_figure(df: pd.DataFrame, chart_title: str) -> Figure:
     return fig
 
 
+def exclude_buckets(df: pd.DataFrame, patterns: Iterable[str]) -> pd.DataFrame:
+    if not patterns or "Bucket Name" not in df.columns:
+        return df
+
+    drop_mask = df["Bucket Name"].fillna("").apply(
+        lambda bucket: any(fnmatchcase(bucket, pattern) for pattern in patterns)
+    )
+    return df.loc[~drop_mask].copy()
+
+
 def main() -> None:
     args = parse_args()
     df = load_tasks(args.source)
+    df = exclude_buckets(df, args.exclude_buckets)
     if df.empty:
         raise SystemExit("No tasks with schedule info found in Planner export")
 
