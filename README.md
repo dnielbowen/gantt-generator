@@ -3,13 +3,13 @@
 
 This repository turns the MS Teams task plan into an interactive Plotly Gantt chart. It accepts either the Microsoft Planner CSV export or the equivalent XLSX workbook (the `Tasks` worksheet) and produces a standalone HTML timeline.
 
-!(Gantt screenshot)[./docs/screenshot.jpg]
+![Gantt screenshot](./docs/screenshot.jpg)
 
 ## Getting Started
 
 First, export the tasks from MS Teams:
 
-!(Export tasks)[./docs/export.jpg]
+![Export tasks](./docs/export.jpg)
 
 1. **Create/activate the virtual environment**
    ```bash
