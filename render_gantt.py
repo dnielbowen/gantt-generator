@@ -227,10 +227,39 @@ def build_figure(df: pd.DataFrame, chart_title: str) -> Figure:
         margin=dict(l=240, r=80, t=80, b=40),
     )
 
+    # Add green border to completed tasks
+    _style_completed_bars(fig, df)
+
     # Add avatar icons for assignees
     _add_assignee_avatars(fig, df)
 
     return fig
+
+
+def _style_completed_bars(fig: Figure, df: pd.DataFrame) -> None:
+    """Add green border to completed task bars."""
+    if "Progress %" not in df.columns:
+        return
+
+    # Build lookup: task_name -> is_completed
+    completed_tasks = set(df.loc[df["Progress %"] == 100, "Task Name"])
+
+    for trace in fig.data:
+        if trace.type != "bar":
+            continue
+        # Each bar trace may contain multiple tasks; style each bar individually
+        if trace.y is None:
+            continue
+        task_names = list(trace.y)
+        border_colors = [
+            "#00FF00" if task in completed_tasks else "rgba(0,0,0,0)"
+            for task in task_names
+        ]
+        border_widths = [
+            2 if task in completed_tasks else 0
+            for task in task_names
+        ]
+        trace.marker.line = dict(color=border_colors, width=border_widths)
 
 
 def _add_assignee_avatars(fig: Figure, df: pd.DataFrame) -> None:
