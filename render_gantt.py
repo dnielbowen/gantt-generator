@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import re
 from datetime import datetime, timedelta
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -11,6 +13,13 @@ from typing import Iterable
 import pandas as pd
 import plotly.express as px
 from plotly.graph_objs import Figure
+
+# Avatar color palette for assignees
+AVATAR_COLORS = [
+    "#E57373", "#81C784", "#64B5F6", "#FFD54F", "#BA68C8",
+    "#4DB6AC", "#FF8A65", "#A1887F", "#90A4AE", "#F06292",
+    "#AED581", "#7986CB", "#FFB74D", "#4DD0E1", "#9575CD",
+]
 
 DATE_COLUMNS: Iterable[str] = (
     "Created Date",
@@ -109,6 +118,37 @@ def _read_planner_export(path: Path) -> pd.DataFrame:
     raise ValueError(f"Unsupported file type: {path.suffix or 'unknown'}")
 
 
+def _get_initials(name: str) -> str:
+    """Extract two-letter initials from a name (first + last, ignoring middle and suffixes)."""
+    # Strip common suffixes (normalized: lowercase, no punctuation)
+    suffixes = {"phd", "md", "jr", "sr", "ii", "iii", "iv", "esq", "dds", "dvm"}
+    parts = name.strip().split()
+    # Remove trailing suffix parts (normalize by removing all punctuation)
+    while parts and re.sub(r"[^a-z]", "", parts[-1].lower()) in suffixes:
+        parts.pop()
+    if not parts:
+        return "??"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    # First and last name, ignoring middle names/initials
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def _parse_assignees(assignee_str: str | float) -> list[str]:
+    """Parse semicolon-delimited assignee string into list of names."""
+    if pd.isna(assignee_str) or not str(assignee_str).strip():
+        return []
+    return [name.strip() for name in str(assignee_str).split(";") if name.strip()]
+
+
+def _get_assignee_color(name: str, color_map: dict[str, str]) -> str:
+    """Get consistent color for an assignee."""
+    if name not in color_map:
+        idx = len(color_map) % len(AVATAR_COLORS)
+        color_map[name] = AVATAR_COLORS[idx]
+    return color_map[name]
+
+
 def _derive_schedule(row: pd.Series) -> pd.Series:
     start = row.get("Start date")
     finish = row.get("Due date")
@@ -187,7 +227,59 @@ def build_figure(df: pd.DataFrame, chart_title: str) -> Figure:
         margin=dict(l=240, r=80, t=80, b=40),
     )
 
+    # Add avatar icons for assignees
+    _add_assignee_avatars(fig, df)
+
     return fig
+
+
+def _add_assignee_avatars(fig: Figure, df: pd.DataFrame) -> None:
+    """Add avatar circles with initials for each task's assignees."""
+    if "Assigned To" not in df.columns:
+        return
+
+    color_map: dict[str, str] = {}
+    task_names = df["Task Name"].tolist()
+
+    # Calculate spacing based on typical task duration
+    avg_duration = (df["Finish"] - df["Start"]).mean()
+    spacing = avg_duration * 0.08
+
+    for idx, row in df.iterrows():
+        assignees = _parse_assignees(row.get("Assigned To"))
+        if not assignees:
+            continue
+
+        start_ts = row["Start"]
+        task_name = row["Task Name"]
+
+        for i, assignee in enumerate(assignees):
+            initials = _get_initials(assignee)
+            color = _get_assignee_color(assignee, color_map)
+
+            # Position circles starting from left of bar, spaced apart
+            x_pos = start_ts + spacing * (1.0 + i * 2.0)
+
+            # Add circular marker (maintains aspect ratio)
+            fig.add_trace(
+                dict(
+                    type="scatter",
+                    x=[x_pos],
+                    y=[task_name],
+                    mode="markers+text",
+                    marker=dict(
+                        size=24,
+                        color=color,
+                        line=dict(color="white", width=2),
+                    ),
+                    text=initials,
+                    textfont=dict(color="white", size=9),
+                    textposition="middle center",
+                    hovertext=assignee,
+                    hoverinfo="text",
+                    showlegend=False,
+                )
+            )
 
 
 def exclude_buckets(df: pd.DataFrame, patterns: Iterable[str]) -> pd.DataFrame:

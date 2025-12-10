@@ -3,3 +3,6 @@
 *.html
 *.csv
 *.xlsx
+
+.playwright-mcp/
+__pycache__/
